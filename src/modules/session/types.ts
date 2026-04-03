@@ -80,6 +80,7 @@ export type TrainingMode =
   | 'targeted'      // Lvl 6 – weighted prompts on weak senses
   | 'focused'       // Lvl 7 – sustained focus on one chosen object
   | 'guided_shift'  // Lvl 8 – randomly alternates guided note/focus prompts
+  | 'spatial_feel'  // Lvl 9 – basic feel-direction prompts
   | 'sustain'       // Lvl 2 – hold a sense for 10+ s
   | 'rapid_fire'    // Lvl 3 – maximise noticings/s
   | 'inner_outer'   // Lvl 4 – inner vs outer tagging

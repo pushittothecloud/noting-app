@@ -75,6 +75,14 @@ export const ACTIVE_MODES: ModeDefinition[] = [
     guided: true,
     supportsHold: true,
   },
+  {
+    id: 'spatial_feel',
+    level: 9,
+    title: 'Spatial Feel',
+    description: 'Basic body-space prompts: Feel up/down/left/right/forward/back.',
+    guided: true,
+    supportsHold: false,
+  },
 ]
 
 export function getModeDefinition(mode: TrainingMode): ModeDefinition {
@@ -95,11 +103,97 @@ export function isGuidedMode(mode: TrainingMode) {
 }
 
 const GUIDED_SENSES: SenseKey[] = ['see', 'hear', 'feel', 'taste']
-const GRANULARITY_SUBCUES: Record<SenseKey, string[]> = {
-  see: ['color', 'brightness', 'edges', 'shape', 'movement'],
-  hear: ['pitch', 'volume', 'rhythm', 'texture', 'direction'],
-  feel: ['pressure', 'temperature', 'texture', 'pulsing', 'movement'],
-  taste: ['intensity', 'aftertaste', 'location', 'warmth', 'sharpness'],
+const SPATIAL_DIRECTIONS = ['up', 'down', 'left', 'right', 'forward', 'back'] as const
+
+type GranularityTier = 'core' | 'deeper' | 'micro' | 'advanced'
+
+interface GranularityAspect {
+  tier: GranularityTier
+  prompt: string
+}
+
+const GRANULARITY_CATALOG: Record<SenseKey, GranularityAspect[]> = {
+  see: [
+    { tier: 'core', prompt: 'Notice color' },
+    { tier: 'core', prompt: 'Notice light vs dark' },
+    { tier: 'core', prompt: 'Notice shape' },
+    { tier: 'core', prompt: 'Notice size' },
+    { tier: 'core', prompt: 'Notice location in space' },
+    { tier: 'core', prompt: 'Notice movement' },
+    { tier: 'deeper', prompt: 'Notice edges (sharp or soft)' },
+    { tier: 'deeper', prompt: 'Notice contrast' },
+    { tier: 'deeper', prompt: 'Notice depth (near or far)' },
+    { tier: 'deeper', prompt: 'Notice focus vs blur' },
+    { tier: 'deeper', prompt: 'Notice transparency or reflection' },
+    { tier: 'deeper', prompt: 'Notice pattern and repetition' },
+    { tier: 'micro', prompt: 'Notice tiny visual flicker or change' },
+    { tier: 'micro', prompt: 'Notice visual noise' },
+    { tier: 'micro', prompt: 'Notice tiny movement shifts' },
+    { tier: 'micro', prompt: 'Notice gradients and transitions' },
+    { tier: 'advanced', prompt: 'Notice inner visual imagery' },
+    { tier: 'advanced', prompt: 'Notice memory flashes in the visual field' },
+    { tier: 'advanced', prompt: 'Notice imagination overlays' },
+  ],
+  hear: [
+    { tier: 'core', prompt: 'Notice pitch (high or low)' },
+    { tier: 'core', prompt: 'Notice volume (loud or quiet)' },
+    { tier: 'core', prompt: 'Notice rhythm and timing' },
+    { tier: 'core', prompt: 'Notice duration (short or long)' },
+    { tier: 'deeper', prompt: 'Notice tone quality or timbre' },
+    { tier: 'deeper', prompt: 'Notice sound texture' },
+    { tier: 'deeper', prompt: 'Notice direction in space' },
+    { tier: 'deeper', prompt: 'Notice distance (near or far)' },
+    { tier: 'deeper', prompt: 'Notice echo or reverb' },
+    { tier: 'micro', prompt: 'Notice the attack at sound onset' },
+    { tier: 'micro', prompt: 'Notice decay as sound fades' },
+    { tier: 'micro', prompt: 'Notice subtle vibration quality' },
+    { tier: 'micro', prompt: 'Notice quiet background hums' },
+    { tier: 'deeper', prompt: 'Notice foreground vs background layers' },
+    { tier: 'deeper', prompt: 'Notice multiple simultaneous sources' },
+    { tier: 'advanced', prompt: 'Notice inner speech as sound' },
+    { tier: 'advanced', prompt: 'Notice imagined sounds' },
+  ],
+  feel: [
+    { tier: 'core', prompt: 'Notice pressure' },
+    { tier: 'core', prompt: 'Notice temperature' },
+    { tier: 'core', prompt: 'Notice movement (expand or contract)' },
+    { tier: 'core', prompt: 'Notice contact points' },
+    { tier: 'deeper', prompt: 'Notice tingling' },
+    { tier: 'deeper', prompt: 'Notice pulsing or heartbeat' },
+    { tier: 'deeper', prompt: 'Notice tightness or tension' },
+    { tier: 'deeper', prompt: 'Notice softness or relaxation' },
+    { tier: 'deeper', prompt: 'Notice itch or irritation' },
+    { tier: 'deeper', prompt: 'Notice vibration' },
+    { tier: 'deeper', prompt: 'Notice breath in chest or belly' },
+    { tier: 'deeper', prompt: 'Notice gut sensation shifts' },
+    { tier: 'deeper', prompt: 'Notice location and boundaries in the body' },
+    { tier: 'micro', prompt: 'Zoom into tiny flickering sensations' },
+    { tier: 'micro', prompt: 'Notice waves and tiny pulses' },
+    { tier: 'micro', prompt: 'Notice shifting intensity moment to moment' },
+    { tier: 'advanced', prompt: 'Notice heaviness, openness, or contraction' },
+    { tier: 'advanced', prompt: 'Notice agitation in the body field' },
+  ],
+  // taste key is used for smell/taste channel in this app.
+  taste: [
+    { tier: 'core', prompt: 'Notice taste quality (sweet, sour, salty, bitter, umami)' },
+    { tier: 'core', prompt: 'Notice smell intensity (strong or faint)' },
+    { tier: 'core', prompt: 'Notice pleasant vs unpleasant tone' },
+    { tier: 'core', prompt: 'Notice familiar vs unfamiliar quality' },
+    { tier: 'deeper', prompt: 'Notice sharp vs dull smell/taste tone' },
+    { tier: 'deeper', prompt: 'Notice flavor blend (taste plus smell)' },
+    { tier: 'deeper', prompt: 'Notice aftertaste' },
+    { tier: 'deeper', prompt: 'Notice lingering vs instant quality' },
+    { tier: 'micro', prompt: 'Notice fading vs intensifying change' },
+    { tier: 'micro', prompt: 'Notice subtle background smells' },
+    { tier: 'micro', prompt: 'Notice breath-related taste shifts' },
+  ],
+}
+
+function getAllowedGranularityTiers(elapsedMs: number): GranularityTier[] {
+  if (elapsedMs < 12000) return ['core']
+  if (elapsedMs < 25000) return ['core', 'deeper']
+  if (elapsedMs < 40000) return ['core', 'deeper', 'micro']
+  return ['core', 'deeper', 'micro', 'advanced']
 }
 
 export function createGuidedPrompt(
@@ -114,7 +208,7 @@ export function createGuidedPrompt(
     return {
       id: nanoid(),
       kind: 'reaction',
-      cue: 'Detect signal and respond',
+      cue: `Sense: ${SENSES[targetSense].label}`,
       targetSense,
       presentedAtMs: elapsedMs,
     }
@@ -160,14 +254,28 @@ export function createGuidedPrompt(
       ? previousTarget
       : GUIDED_SENSES[Math.floor(Math.random() * GUIDED_SENSES.length)]
 
-    const aspect = GRANULARITY_SUBCUES[targetSense][Math.floor(Math.random() * GRANULARITY_SUBCUES[targetSense].length)]
-    const cue = `${SENSES[targetSense].label}: ${aspect}`
+    const allowedTiers = getAllowedGranularityTiers(elapsedMs)
+    const pool = GRANULARITY_CATALOG[targetSense].filter((aspect) => allowedTiers.includes(aspect.tier))
+    const picked = pool[Math.floor(Math.random() * pool.length)]
+    const cue = `${SENSES[targetSense].label}: ${picked.prompt}`
 
     return {
       id: nanoid(),
       kind: 'sense',
       cue,
       targetSense,
+      presentedAtMs: elapsedMs,
+    }
+  }
+
+  if (mode === 'spatial_feel') {
+    const direction = SPATIAL_DIRECTIONS[Math.floor(Math.random() * SPATIAL_DIRECTIONS.length)]
+
+    return {
+      id: nanoid(),
+      kind: 'sense',
+      cue: `Feel ${direction}`,
+      targetSense: 'feel',
       presentedAtMs: elapsedMs,
     }
   }

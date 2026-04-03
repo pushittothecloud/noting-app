@@ -11,10 +11,54 @@ import { SENSES, type SenseKey, type TrainingMode } from '../modules/session/typ
 import { isGuidedMode } from '../modules/training/modes'
 import styles from './Session.module.css'
 
+function getIntroLines(mode: TrainingMode): string[] {
+  switch (mode) {
+    case 'reaction':
+      return ['React to the stimulus only.', 'Flash means See. Beep means Hear.']
+    case 'guided':
+      return ['Match each prompt quickly and accurately.', 'One prompt, one clean response.']
+    case 'guided_granularity':
+      return ['Stay on one sense and extract details.', 'Do not switch objects, find more inside it.']
+    case 'sense_shift':
+      return ['Follow transitions in exact order.', 'Drop the old sense instantly before switching.']
+    case 'free':
+      return ['Note what is present right now.', 'Keep labeling with simple, steady taps.']
+    case 'targeted':
+      return ['This drills your weaker senses.', 'Prioritize speed and accuracy under prompts.']
+    case 'focused':
+      return ['Choose one object and hold while stable.', 'Release on drift and re-hold on refocus.']
+    case 'guided_shift':
+      return ['This alternates noting and focused holding.', 'Adapt quickly as the prompt type changes.']
+    case 'spatial_feel':
+      return ['Keep it simple: press Feel for each prompt.', 'Track direction in body-space: up, down, left, right, forward, back.']
+    case 'sustain':
+      return ['Hold one sense steadily for longer periods.', 'Relax effort while keeping continuity.']
+    case 'rapid_fire':
+      return ['Maximize clean notes per second.', 'Stay precise while increasing tempo.']
+    case 'inner_outer':
+      return ['Notice inner and outer channels clearly.', 'Tag each without overthinking.']
+    case 'flow':
+      return ['Switch between focused and open awareness.', 'Keep transitions smooth and intentional.']
+    default:
+      return ['Settle in and follow the cues.', 'You can skip this intro anytime.']
+  }
+}
+
 export function Session() {
   const navigate = useNavigate()
   const location = useLocation()
   const { settings } = useSettingsStore()
+  const focusConfig = location.state as {
+    mode?: TrainingMode
+    focusedSenses?: SenseKey[]
+    focusedSense?: SenseKey
+    durationSec?: number | null
+    senseWeights?: Partial<Record<SenseKey, number>>
+  } | null
+  const plannedMode = focusConfig?.mode ?? settings.defaultMode
+  const plannedDurationSec = plannedMode === 'reaction'
+    ? 30
+    : (focusConfig?.durationSec ?? settings.defaultDurationSec)
   const {
     active,
     status,
@@ -31,30 +75,57 @@ export function Session() {
   const [elapsed, setElapsed] = useState(0)
   const [heldSense, setHeldSense] = useState<SenseKey | null>(null)
   const [focusedObject, setFocusedObject] = useState<SenseKey | null>(null)
+  const [reactionFlashActive, setReactionFlashActive] = useState(false)
+  const [senseShiftStep, setSenseShiftStep] = useState(0)
+  const [showIntro, setShowIntro] = useState(true)
+  const [sessionStarted, setSessionStarted] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const spokenPromptIdRef = useRef<string | null>(null)
+  const reactionStimulusIdRef = useRef<string | null>(null)
+  const shiftPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const granularityPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reactionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const isFreeModRef = useRef(false)
   const freeSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const reactionFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const introSpokenModeRef = useRef<TrainingMode | null>(null)
 
-  // auto-start on mount
-  useEffect(() => {
-    const focusConfig = location.state as {
-      mode?: TrainingMode
-      focusedSenses?: SenseKey[]
-      focusedSense?: SenseKey
-      durationSec?: number | null
-      senseWeights?: Partial<Record<SenseKey, number>>
-    } | null
+  function speakIntro() {
+    if (!settings.spokenFeedbackEnabled || !('speechSynthesis' in window)) return
 
-    const mode = focusConfig?.mode ?? settings.defaultMode
-    const initialFocusedSense = focusConfig?.focusedSense ?? (mode === 'focused' ? 'see' : null)
+    const text = getIntroLines(plannedMode).join('. ')
+    window.speechSynthesis.cancel()
+
+    const speakOnce = () => {
+      const utterance = new SpeechSynthesisUtterance(text)
+      utterance.rate = 0.96
+      utterance.pitch = 0.96
+      utterance.volume = 0.72
+      window.speechSynthesis.speak(utterance)
+    }
+
+    // Some browsers silently drop the first call until voices are ready.
+    speakOnce()
+    setTimeout(() => {
+      if (!window.speechSynthesis.speaking) {
+        speakOnce()
+      }
+    }, 220)
+  }
+
+  function beginSession() {
+    if (sessionStarted) return
+
+    const initialFocusedSense = focusConfig?.focusedSense ?? (plannedMode === 'focused' ? 'see' : null)
     setFocusedObject(initialFocusedSense)
+    setShowIntro(false)
+    setSessionStarted(true)
 
     startSession({
-      mode,
-      durationSec: focusConfig?.durationSec ?? settings.defaultDurationSec,
-      guidedMode: isGuidedMode(mode),
+      mode: plannedMode,
+      durationSec: plannedDurationSec,
+      guidedMode: isGuidedMode(plannedMode),
       feedbackEnabled: settings.feedbackEnabled,
       innerOuterEnabled: settings.innerOuterEnabled,
       backgroundAudio: settings.backgroundAudio,
@@ -64,12 +135,17 @@ export function Session() {
       senseWeights: focusConfig?.senseWeights,
     })
 
+    if (intervalRef.current) clearInterval(intervalRef.current)
     intervalRef.current = setInterval(() => setElapsed(getElapsedMs()), 100)
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }
+
+  useEffect(() => {
+    if (!showIntro || !settings.spokenFeedbackEnabled || !('speechSynthesis' in window)) return
+    if (introSpokenModeRef.current === plannedMode) return
+
+    introSpokenModeRef.current = plannedMode
+    speakIntro()
+  }, [showIntro, plannedMode, settings.spokenFeedbackEnabled])
 
   useEffect(() => {
     if (!active?.config.durationSec) return
@@ -83,6 +159,46 @@ export function Session() {
     enabled: !!active && status === 'running',
     onTap(sense) {
       if (isFocusedMode) return
+
+      if (isSenseShiftMode && currentPrompt?.kind === 'transition') {
+        const shiftPath = currentPrompt.transitionPath
+          ?? [currentPrompt.fromSense, currentPrompt.targetSense].filter((item): item is SenseKey => Boolean(item))
+        const expectedSense = shiftPath[senseShiftStep] ?? shiftPath[shiftPath.length - 1]
+        const matched = sense === expectedSense
+
+        if (!matched) {
+          recordNoting({
+            sense,
+            inputType: 'tap',
+            attentionType: 'open',
+            source: 'prompted',
+            prompt: { isCorrect: false },
+          })
+          playPromptResultTone(false, audioContextRef, settings.audioFeedbackEnabled)
+          setSenseShiftStep(sense === shiftPath[0] ? 1 : 0)
+          if (shouldFlashSenseFeedback) flash(sense)
+          return
+        }
+
+        const nextStep = senseShiftStep + 1
+        if (nextStep < shiftPath.length) {
+          setSenseShiftStep(nextStep)
+          if (shouldFlashSenseFeedback) flash(sense)
+          return
+        }
+
+        recordNoting({
+          sense,
+          inputType: 'tap',
+          attentionType: 'open',
+          source: 'prompted',
+          prompt: { isCorrect: true },
+        })
+        playPromptResultTone(true, audioContextRef, settings.audioFeedbackEnabled)
+        setSenseShiftStep(0)
+        if (shouldFlashSenseFeedback) flash(sense)
+        return
+      }
 
       // Speak label immediately in free mode — directly in the event callback,
       // not via useEffect, so there is zero render-cycle latency.
@@ -119,7 +235,9 @@ export function Session() {
       })
 
       if (isPromptCorrect != null) {
-        playPromptResultTone(isPromptCorrect, audioContextRef, settings.audioFeedbackEnabled)
+        if (!isReactionMode) {
+          playPromptResultTone(isPromptCorrect, audioContextRef, settings.audioFeedbackEnabled)
+        }
       }
 
       if (shouldFlashSenseFeedback) flash(sense)
@@ -138,7 +256,68 @@ export function Session() {
     },
     onHoldEnd(sense, durationMs) {
       const acceptsGuidedHold = isGuidedShiftMode && currentPrompt?.kind === 'attention'
-      if (isGuided && !acceptsGuidedHold) return
+      if (isGuided && !acceptsGuidedHold) {
+        if (isSenseShiftMode && currentPrompt?.kind === 'transition') {
+          const shiftPath = currentPrompt.transitionPath
+            ?? [currentPrompt.fromSense, currentPrompt.targetSense].filter((item): item is SenseKey => Boolean(item))
+          const expectedSense = shiftPath[senseShiftStep] ?? shiftPath[shiftPath.length - 1]
+          const matched = sense === expectedSense
+
+          if (!matched) {
+            recordNoting({
+              sense,
+              inputType: 'tap',
+              attentionType: 'open',
+              source: 'prompted',
+              prompt: { isCorrect: false },
+            })
+            playPromptResultTone(false, audioContextRef, settings.audioFeedbackEnabled)
+            setSenseShiftStep(sense === shiftPath[0] ? 1 : 0)
+            if (shouldFlashSenseFeedback) flash(sense)
+            return
+          }
+
+          const nextStep = senseShiftStep + 1
+          if (nextStep < shiftPath.length) {
+            setSenseShiftStep(nextStep)
+            if (shouldFlashSenseFeedback) flash(sense)
+            return
+          }
+
+          recordNoting({
+            sense,
+            inputType: 'tap',
+            attentionType: 'open',
+            source: 'prompted',
+            prompt: { isCorrect: true },
+          })
+          playPromptResultTone(true, audioContextRef, settings.audioFeedbackEnabled)
+          setSenseShiftStep(0)
+          if (shouldFlashSenseFeedback) flash(sense)
+          return
+        }
+
+        // In guided tap-only modes (guided, targeted, granularity, sense-shift, reaction),
+        // a slightly long press should still count as the prompted tap instead of being dropped.
+        const isPromptCorrect = currentPrompt ? sense === currentPrompt.targetSense : null
+
+        recordNoting({
+          sense,
+          inputType: 'tap',
+          attentionType: 'open',
+          source: 'prompted',
+          prompt: isPromptCorrect != null ? { isCorrect: isPromptCorrect } : undefined,
+        })
+
+        if (isPromptCorrect != null) {
+          if (!isReactionMode) {
+            playPromptResultTone(isPromptCorrect, audioContextRef, settings.audioFeedbackEnabled)
+          }
+        }
+
+        if (shouldFlashSenseFeedback) flash(sense)
+        return
+      }
       if (isFocusedMode) {
         const targetSense = focusedObject ?? sense
         if (sense !== targetSense) return
@@ -159,7 +338,9 @@ export function Session() {
       })
 
       if (isPromptCorrect != null) {
-        playPromptResultTone(isPromptCorrect, audioContextRef, settings.audioFeedbackEnabled)
+        if (!isReactionMode) {
+          playPromptResultTone(isPromptCorrect, audioContextRef, settings.audioFeedbackEnabled)
+        }
       }
     },
     onSpacebar() {
@@ -185,13 +366,20 @@ export function Session() {
   const elapsedSec = elapsed / 1000
   const nps = elapsedSec > 0 ? (totalNotings / elapsedSec).toFixed(2) : '0.00'
   const isPaused = status === 'paused'
-  const mode = active?.config.mode ?? settings.defaultMode
+  const mode = active?.config.mode ?? plannedMode
+  const isReactionMode = mode === 'reaction'
+  const isGranularityMode = mode === 'guided_granularity'
+  const isSenseShiftMode = mode === 'sense_shift'
   const isFreeMode = mode === 'free'
   isFreeModRef.current = isFreeMode
   const isFocusedMode = mode === 'focused'
   const isGuidedShiftMode = mode === 'guided_shift'
   const isGuided = isGuidedMode(mode)
   const currentPrompt = active?.currentPrompt ?? null
+  const shiftPathForDisplay = isSenseShiftMode && currentPrompt?.kind === 'transition'
+    ? (currentPrompt.transitionPath
+      ?? [currentPrompt.fromSense, currentPrompt.targetSense].filter((item): item is SenseKey => Boolean(item)))
+    : null
   const shouldFlashSenseFeedback =
     settings.feedbackEnabled || (!isGuided && (settings.audioFeedbackEnabled || settings.spokenFeedbackEnabled))
   const focusedHolds = (active?.notings ?? []).filter((n) => {
@@ -203,13 +391,78 @@ export function Session() {
   const focusedTotalMs = focusedHolds.reduce((sum, n) => sum + (n.holdDurationMs ?? 0), 0)
 
   useEffect(() => {
-    if (active && isGuided && !active.currentPrompt) {
+    setSenseShiftStep(0)
+  }, [isSenseShiftMode, currentPrompt?.id])
+
+  useEffect(() => {
+    if (active && isGuided && !isSenseShiftMode && !isReactionMode && !active.currentPrompt) {
       queueNextPrompt()
     }
-  }, [active, isGuided, queueNextPrompt])
+  }, [active, isGuided, isSenseShiftMode, isReactionMode, queueNextPrompt])
+
+  useEffect(() => {
+    if (!active || !isReactionMode || isPaused) return
+    if (active.currentPrompt) return
+
+    if (reactionPromptTimerRef.current) {
+      clearTimeout(reactionPromptTimerRef.current)
+    }
+
+    const delayMs = Math.floor(Math.random() * 2000) + 1
+    reactionPromptTimerRef.current = setTimeout(() => {
+      queueNextPrompt()
+    }, delayMs)
+
+    return () => {
+      if (reactionPromptTimerRef.current) {
+        clearTimeout(reactionPromptTimerRef.current)
+      }
+    }
+  }, [active, isReactionMode, isPaused, queueNextPrompt])
+
+  useEffect(() => {
+    if (!active || !isSenseShiftMode || isPaused) return
+    if (active.currentPrompt) return
+
+    if (shiftPromptTimerRef.current) {
+      clearTimeout(shiftPromptTimerRef.current)
+    }
+
+    // Add breathing room so users can actually follow the requested transition sequence.
+    shiftPromptTimerRef.current = setTimeout(() => {
+      queueNextPrompt()
+    }, 650)
+
+    return () => {
+      if (shiftPromptTimerRef.current) {
+        clearTimeout(shiftPromptTimerRef.current)
+      }
+    }
+  }, [active, isSenseShiftMode, isPaused, queueNextPrompt])
+
+  useEffect(() => {
+    if (!active || !isGranularityMode || isPaused) return
+    if (active.currentPrompt) return
+
+    if (granularityPromptTimerRef.current) {
+      clearTimeout(granularityPromptTimerRef.current)
+    }
+
+    // Give the user a beat to process each aspect cue before the next one appears.
+    granularityPromptTimerRef.current = setTimeout(() => {
+      queueNextPrompt()
+    }, 550)
+
+    return () => {
+      if (granularityPromptTimerRef.current) {
+        clearTimeout(granularityPromptTimerRef.current)
+      }
+    }
+  }, [active, isGranularityMode, isPaused, queueNextPrompt])
 
   useEffect(() => {
     if (!isGuided || !currentPrompt || isPaused) return
+    if (isReactionMode) return
     if (!settings.spokenFeedbackEnabled || !('speechSynthesis' in window)) return
     if (spokenPromptIdRef.current === currentPrompt.id) return
 
@@ -220,12 +473,41 @@ export function Session() {
     utterance.volume = 0.65
     window.speechSynthesis.cancel()
     window.speechSynthesis.speak(utterance)
-  }, [isGuided, currentPrompt, isPaused, settings.spokenFeedbackEnabled])
+  }, [isGuided, isReactionMode, currentPrompt, isPaused, settings.spokenFeedbackEnabled])
+
+  useEffect(() => {
+    if (!isReactionMode || !currentPrompt || isPaused) return
+    if (currentPrompt.kind !== 'reaction') return
+    if (reactionStimulusIdRef.current === currentPrompt.id) return
+
+    reactionStimulusIdRef.current = currentPrompt.id
+    if (currentPrompt.targetSense === 'see') {
+      setReactionFlashActive(true)
+      if (reactionFlashTimerRef.current) {
+        clearTimeout(reactionFlashTimerRef.current)
+      }
+      reactionFlashTimerRef.current = setTimeout(() => setReactionFlashActive(false), 180)
+    } else if (currentPrompt.targetSense === 'hear') {
+      playReactionStimulusBeep(audioContextRef)
+    }
+  }, [isReactionMode, currentPrompt, isPaused])
 
   useEffect(() => {
     return () => {
       if (freeSpeechTimerRef.current) {
         clearTimeout(freeSpeechTimerRef.current)
+      }
+      if (reactionFlashTimerRef.current) {
+        clearTimeout(reactionFlashTimerRef.current)
+      }
+      if (shiftPromptTimerRef.current) {
+        clearTimeout(shiftPromptTimerRef.current)
+      }
+      if (granularityPromptTimerRef.current) {
+        clearTimeout(granularityPromptTimerRef.current)
+      }
+      if (reactionPromptTimerRef.current) {
+        clearTimeout(reactionPromptTimerRef.current)
       }
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel()
@@ -242,13 +524,50 @@ export function Session() {
 
   return (
     <main className={styles.page}>
+      {showIntro && (
+        <section className={styles.introCard}>
+          <h3 className={styles.introTitle}>Quick Training Phase</h3>
+          <p className={styles.introMode}>{mode.replace('_', ' ')}</p>
+          {getIntroLines(mode).map((line) => (
+            <p key={line} className={styles.introLine}>{line}</p>
+          ))}
+          <div className={styles.introActions}>
+            <button className={styles.introBtnPrimary} onClick={beginSession}>Start Session</button>
+            <button
+              className={styles.introBtnSecondary}
+              onClick={speakIntro}
+            >
+              Play Voice Guide
+            </button>
+            <button
+              className={styles.introBtnSecondary}
+              onClick={() => {
+                if ('speechSynthesis' in window) {
+                  window.speechSynthesis.cancel()
+                }
+                beginSession()
+              }}
+            >
+              Skip Voice
+            </button>
+          </div>
+        </section>
+      )}
+
       <SenseFeedbackOverlay
         sense={activeSense}
         visible={settings.feedbackEnabled}
         styleMode={settings.visualFeedbackStyle}
       />
+      {isReactionMode && <div className={`${styles.reactionFlash} ${reactionFlashActive ? styles.reactionFlashActive : ''}`} />}
       <div className={styles.modeLabel}>{
-        isFreeMode
+        isReactionMode
+          ? 'Reaction Training'
+          : isGranularityMode
+          ? 'Guided Granularity'
+          : isSenseShiftMode
+            ? 'Sense Door Shifting'
+          : isFreeMode
           ? 'Free Noting'
           : mode === 'targeted'
             ? 'Targeted Training'
@@ -256,6 +575,8 @@ export function Session() {
               ? 'Focused Attention'
               : mode === 'guided_shift'
                 ? 'Guided Shift'
+                : mode === 'spatial_feel'
+                  ? 'Spatial Feel'
                 : isGuided
                   ? 'Guided Mode'
                   : mode.replace('_', ' ')
@@ -268,6 +589,27 @@ export function Session() {
 
       {isFreeMode && !isPaused && (
         <p className={styles.guidance}>Notice what arises and label it with a single key press.</p>
+      )}
+
+      {isGranularityMode && !isPaused && (
+        <p className={styles.guidance}>Do not switch objects. Keep tapping the same sense for new details.</p>
+      )}
+
+      {isSenseShiftMode && !isPaused && (
+        <p className={styles.guidance}>Drop the old sense instantly. Do not drag it with you.</p>
+      )}
+
+      {mode === 'spatial_feel' && !isPaused && (
+        <p className={styles.guidance}>Prompt says the direction. You respond with Feel every time.</p>
+      )}
+
+      {isReactionMode && !isPaused && (
+        <>
+          <div className={styles.flashWarning} role="status" aria-live="polite">
+            Flashing light warning: visual pulses will appear.
+          </div>
+          <p className={styles.guidance}>Neural warm-up: react to flash as See and beep as Hear.</p>
+        </>
       )}
 
       {isFocusedMode && !isPaused && (
@@ -312,6 +654,12 @@ export function Session() {
           <span className={styles.promptHint}>
             {currentPrompt.kind === 'attention'
               ? 'Hold the matching key while focused. Release when focus drifts.'
+              : currentPrompt.kind === 'reaction'
+                ? 'Flash = See, Beep = Hear. Respond fast.'
+                : currentPrompt.kind === 'transition'
+                  ? shiftPathForDisplay
+                    ? `Follow in order (${Math.min(senseShiftStep + 1, shiftPathForDisplay.length)}/${shiftPathForDisplay.length}).`
+                    : 'Follow the sequence in order.'
               : 'Press the matching direction as soon as it becomes clear.'}
           </span>
         </div>
@@ -422,4 +770,32 @@ function playSessionCompleteTone(audioContextRef: { current: AudioContext | null
     osc.start(start)
     osc.stop(start + 0.11)
   })
+}
+
+function playReactionStimulusBeep(audioContextRef: { current: AudioContext | null }) {
+  const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!AudioCtor) return
+  if (!audioContextRef.current) {
+    audioContextRef.current = new AudioCtor()
+  }
+
+  const context = audioContextRef.current
+  if (context.state === 'suspended') {
+    void context.resume()
+  }
+  const now = context.currentTime
+  const osc = context.createOscillator()
+  const gain = context.createGain()
+
+  osc.type = 'sine'
+  osc.frequency.value = 880
+
+  gain.gain.setValueAtTime(0.0001, now)
+  gain.gain.exponentialRampToValueAtTime(0.14, now + 0.012)
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.14)
+
+  osc.connect(gain)
+  gain.connect(context.destination)
+  osc.start(now)
+  osc.stop(now + 0.16)
 }
