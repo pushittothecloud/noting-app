@@ -1,0 +1,145 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.75rem;
+  padding: 2.5rem 1.5rem;
+}
+
+.heading {
+  font-size: 1.6rem;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  margin: 0;
+}
+
+.statRow {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 90px;
+}
+
+.statValue {
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255 255 255 / 0.5);
+  text-align: center;
+}
+
+.insight {
+  color: rgba(255 255 255 / 0.6);
+  font-size: 0.88rem;
+  text-align: center;
+  margin: 0;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.btn {
+  padding: 0.55rem 1.5rem;
+  border: 1px solid rgba(255 255 255 / 0.25);
+  border-radius: 2rem;
+  background: transparent;
+  color: rgba(255 255 255 / 0.7);
+  font-size: 0.85rem;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.btn:hover {
+  color: #fff;
+  border-color: rgba(255 255 255 / 0.6);
+}
+
+/* ── Free-session analysis panel ─────────────────────────────────────────── */
+
+.analysisPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.75rem;
+  border: 1px solid rgba(255 255 255 / 0.12);
+  border-radius: 0.75rem;
+  background: rgba(255 255 255 / 0.04);
+  width: 100%;
+  max-width: 420px;
+}
+
+.senseBreakdown {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.analysisHeading {
+  font-size: 0.78rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255 255 255 / 0.45);
+  margin: 0;
+}
+
+.analysisInsight {
+  font-size: 0.9rem;
+  text-align: center;
+  color: rgba(255 255 255 / 0.75);
+  margin: 0;
+}
+
+.weakSenses {
+  color: #fde68a;
+  font-weight: 600;
+}
+
+.analysisSubtext {
+  font-size: 0.78rem;
+  text-align: center;
+  color: rgba(255 255 255 / 0.45);
+  margin: 0;
+}
+
+.trainBtn {
+  margin-top: 0.25rem;
+  padding: 0.6rem 2rem;
+  border: 1px solid rgba(253 230 138 / 0.5);
+  border-radius: 2rem;
+  background: rgba(253 230 138 / 0.08);
+  color: #fde68a;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.trainBtn:hover {
+  background: rgba(253 230 138 / 0.18);
+  border-color: rgba(253 230 138 / 0.8);
+}

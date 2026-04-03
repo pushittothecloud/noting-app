@@ -1,0 +1,221 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2.5rem 1.5rem;
+}
+
+.heading {
+  font-size: 1.6rem;
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  margin: 0;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
+  max-width: 480px;
+}
+
+.sectionTitle {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255 255 255 / 0.4);
+  margin: 0 0 0.25rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid rgba(255 255 255 / 0.08);
+}
+
+.toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+}
+
+.toggleLabel {
+  font-size: 0.88rem;
+}
+
+.toggleDesc {
+  font-size: 0.75rem;
+  color: rgba(255 255 255 / 0.45);
+  margin-top: 0.15rem;
+}
+
+/* pill switch */
+.switch {
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 99px;
+  border: none;
+  background: rgba(255 255 255 / 0.15);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.switch.on {
+  background: #6ee7f7;
+}
+
+.switch.on::after {
+  transform: translateX(20px);
+}
+
+.fieldRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.88rem;
+}
+
+.select, .input {
+  background: rgba(255 255 255 / 0.07);
+  border: 1px solid rgba(255 255 255 / 0.15);
+  border-radius: 0.4rem;
+  color: #fff;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+  min-width: 120px;
+}
+
+.resetBtn {
+  margin-top: 1rem;
+  padding: 0.4rem 1.2rem;
+  border: 1px solid rgba(255 80 80 / 0.35);
+  border-radius: 2rem;
+  background: transparent;
+  color: rgba(255 80 80 / 0.7);
+  font-size: 0.8rem;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.resetBtn:hover {
+  color: #ff5050;
+  border-color: rgba(255 80 80 / 0.7);
+}
+
+/* ── Key binding editor ───────────────────────────────────────────────────── */
+
+.bindingHint {
+  font-size: 0.75rem;
+  color: rgba(255 255 255 / 0.4);
+  margin: 0 0 0.75rem;
+}
+
+.bindingTable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.bindingRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.bindingEmoji {
+  font-size: 1.2rem;
+  width: 1.6rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.bindingLabel {
+  flex: 1;
+  font-size: 0.85rem;
+  min-width: 80px;
+}
+
+.keyBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.4rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(255 255 255 / 0.2);
+  border-radius: 0.35rem;
+  background: rgba(255 255 255 / 0.06);
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+
+.keyBadge:hover {
+  background: rgba(255 255 255 / 0.12);
+  border-color: rgba(255 255 255 / 0.45);
+}
+
+.keyBadge.capturing {
+  border-color: #6ee7f7;
+  background: rgba(110 231 247 / 0.12);
+  box-shadow: 0 0 0 2px rgba(110 231 247 / 0.3);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+.bindingResetBtn {
+  background: transparent;
+  border: none;
+  color: rgba(255 255 255 / 0.3);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.2rem 0.3rem;
+  border-radius: 0.3rem;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.bindingResetBtn:hover {
+  color: rgba(255 255 255 / 0.7);
+}
+
+.bindingResetAll {
+  margin-top: 0.5rem;
+  background: transparent;
+  border: none;
+  color: rgba(255 255 255 / 0.35);
+  font-size: 0.75rem;
+  cursor: pointer;
+  text-decoration: underline;
+  letter-spacing: 0.04em;
+  padding: 0;
+  transition: color 0.15s;
+}
+
+.bindingResetAll:hover {
+  color: rgba(255 255 255 / 0.7);
+}

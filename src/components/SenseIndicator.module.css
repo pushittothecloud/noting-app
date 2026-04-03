@@ -1,0 +1,33 @@
+.indicator {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: 0.75rem;
+  border: 2px solid var(--sense-color, #fff);
+  color: var(--sense-color, #fff);
+  opacity: 0.35;
+  transition: opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+
+.indicator.active {
+  opacity: 1;
+  transform: scale(1.12);
+  box-shadow: 0 0 24px var(--sense-color, #fff);
+}
+
+/* sizes */
+.sm { padding: 0.4rem 0.6rem; font-size: 0.75rem; }
+.md { padding: 0.6rem 1rem;   font-size: 0.9rem;  }
+.lg { padding: 1rem 1.5rem;   font-size: 1.2rem;  }
+
+.sm .emoji { font-size: 1.2rem; }
+.md .emoji { font-size: 1.8rem; }
+.lg .emoji { font-size: 2.4rem; }
+
+.label {
+  font-size: 0.75em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}

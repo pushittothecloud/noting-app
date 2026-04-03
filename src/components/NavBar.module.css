@@ -1,0 +1,20 @@
+.nav {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid rgba(255 255 255 / 0.08);
+}
+
+.nav a {
+  color: rgba(255 255 255 / 0.5);
+  text-decoration: none;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+
+.nav a:hover,
+.nav a.active {
+  color: #fff;
+}

@@ -1,0 +1,133 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  padding: 3rem 1.5rem;
+}
+
+.title {
+  font-size: 3rem;
+  font-weight: 200;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.sub {
+  color: rgba(255 255 255 / 0.5);
+  font-size: 0.95rem;
+  margin: 0;
+  text-align: center;
+}
+
+.durationPanel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.durationLabel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255 255 255 / 0.46);
+}
+
+.durationButtons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.durationBtn {
+  border: 1px solid rgba(255 255 255 / 0.2);
+  border-radius: 999px;
+  background: rgba(255 255 255 / 0.03);
+  color: rgba(255 255 255 / 0.72);
+  padding: 0.35rem 0.85rem;
+  font-size: 0.76rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.durationBtnActive {
+  border-color: rgba(110 231 247 / 0.65);
+  background: rgba(110 231 247 / 0.16);
+  color: #dffbff;
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 720px;
+}
+
+.modeCard {
+  background: rgba(255 255 255 / 0.04);
+  border: 1px solid rgba(255 255 255 / 0.1);
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  transition: background 0.2s, border-color 0.2s;
+  color: inherit;
+}
+
+.modeCard:hover {
+  background: rgba(255 255 255 / 0.08);
+}
+
+.modeCard.selected {
+  border-color: rgba(255 255 255 / 0.4);
+  background: rgba(255 255 255 / 0.08);
+}
+
+.level {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255 255 255 / 0.4);
+}
+
+.modeTitle {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.modeDesc {
+  font-size: 0.78rem;
+  color: rgba(255 255 255 / 0.55);
+  line-height: 1.4;
+}
+
+.keyMap {
+  display: flex;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.keyRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: rgba(255 255 255 / 0.6);
+}
+
+kbd {
+  background: rgba(255 255 255 / 0.1);
+  border: 1px solid rgba(255 255 255 / 0.2);
+  border-radius: 0.3rem;
+  padding: 0.15rem 0.45rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+}

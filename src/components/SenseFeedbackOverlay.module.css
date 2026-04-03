@@ -1,0 +1,32 @@
+.overlay {
+  position: fixed;
+  top: 5.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 1rem;
+  border-radius: 999px;
+  background: rgba(10 10 15 / 0.78);
+  border: 1px solid rgba(255 255 255 / 0.12);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(0 0 0 / 0.16);
+}
+
+.primary {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.secondary {
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255 255 255 / 0.68);
+}
