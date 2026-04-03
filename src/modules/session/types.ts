@@ -72,11 +72,14 @@ export const KEY_TO_SENSE: Record<string, SenseKey> = {
 
 // ─── Training Modes ───────────────────────────────────────────────────────────
 export type TrainingMode =
-  | 'free'          // Lvl 2 – tap freely
-  | 'guided'        // Lvl 1 – prompted response
-  | 'targeted'      // Lvl 3 – weighted prompts on weak senses
-  | 'focused'       // Lvl 4 – sustained focus on one chosen object
-  | 'guided_shift'  // Lvl 5 – randomly alternates guided note/focus prompts
+  | 'reaction'      // Lvl 1 – stimulus-to-response warm-up (flash/beep)
+  | 'guided'        // Lvl 2 – prompted response
+  | 'guided_granularity' // Lvl 3 – one sense, many sub-notes
+  | 'sense_shift'   // Lvl 4 – shift attention between sense doors
+  | 'free'          // Lvl 5 – tap freely
+  | 'targeted'      // Lvl 6 – weighted prompts on weak senses
+  | 'focused'       // Lvl 7 – sustained focus on one chosen object
+  | 'guided_shift'  // Lvl 8 – randomly alternates guided note/focus prompts
   | 'sustain'       // Lvl 2 – hold a sense for 10+ s
   | 'rapid_fire'    // Lvl 3 – maximise noticings/s
   | 'inner_outer'   // Lvl 4 – inner vs outer tagging
@@ -101,6 +104,8 @@ export interface PromptContext {
   id?: string
   kind?: PromptKind
   cue?: string
+  fromSense?: SenseKey
+  transitionPath?: SenseKey[]
   targetSense?: SenseKey
   responseTimeMs?: number
   isCorrect?: boolean
@@ -111,6 +116,8 @@ export interface ActivePrompt {
   id: string
   kind: PromptKind
   cue: string
+  fromSense?: SenseKey
+  transitionPath?: SenseKey[]
   targetSense: SenseKey
   presentedAtMs: number
 }
