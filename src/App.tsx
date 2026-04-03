@@ -10,10 +10,11 @@ import './index.css'
 
 export function App() {
   const theme = useSettingsStore((s) => s.settings.theme)
+  const routerBasename = window.location.hostname.endsWith('github.io') ? '/noting-app' : '/'
 
   return (
     <div data-theme={theme} style={{ minHeight: '100vh' }}>
-      <BrowserRouter>
+      <BrowserRouter basename={routerBasename}>
         <NavBar />
         <Routes>
           <Route path="/" element={<Home />} />
