@@ -5,11 +5,63 @@ import { useState, useEffect, useRef } from 'react'
 import type { SenseKey, KeyMap } from '../modules/session/types'
 import { SENSES } from '../modules/session/types'
 import { DEFAULT_KEY_MAP, formatKey } from '../modules/input/inputTypes'
+import { getAvailableVoices, getRecommendedVoiceURI, speakText } from '../modules/feedback/speechSynthesis'
 
 // ─── Settings screen ──────────────────────────────────────────────────────────
 
 export function Settings() {
   const { settings, update, reset } = useSettingsStore()
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([])
+  const hasSpeechSynthesis = 'speechSynthesis' in window
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return
+
+    const syncVoices = () => {
+      setVoices(getAvailableVoices())
+    }
+
+    syncVoices()
+    window.speechSynthesis.addEventListener('voiceschanged', syncVoices)
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', syncVoices)
+  }, [])
+
+  useEffect(() => {
+    if (!('speechSynthesis' in window)) return
+    if (settings.spokenVoiceURI) return
+    if (!voices.length) return
+
+    update({ spokenVoiceURI: getRecommendedVoiceURI('en') })
+  }, [settings.spokenVoiceURI, voices, update])
+
+  const selectedVoiceMissing =
+    Boolean(settings.spokenVoiceURI) &&
+    !voices.some((voice) => voice.voiceURI === settings.spokenVoiceURI)
+
+  const handleSpokenNumber =
+    (field: 'spokenRate' | 'spokenPitch' | 'spokenVolume') =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const value = Number(event.target.value)
+      if (Number.isNaN(value)) return
+      update({ [field]: value } as Pick<typeof settings, typeof field>)
+    }
+
+  const testVoice = () => {
+    if (!hasSpeechSynthesis) return
+    void speakText({
+      text: 'Noting voice check. Keep your attention steady and clear.',
+      provider: settings.spokenProvider,
+      voiceURI: settings.spokenVoiceURI,
+      rate: settings.spokenRate,
+      pitch: settings.spokenPitch,
+      volume: settings.spokenVolume,
+      apiKey: settings.spokenApiKey,
+      azureRegion: settings.spokenAzureRegion,
+      azureVoiceName: settings.spokenAzureVoiceName,
+      googleVoiceName: settings.spokenGoogleVoiceName,
+      interrupt: true,
+    })
+  }
 
   return (
     <main className={styles.page}>
@@ -47,6 +99,132 @@ export function Settings() {
           checked={settings.spokenFeedbackEnabled}
           onChange={(v) => update({ spokenFeedbackEnabled: v })}
         />
+        <label className={styles.fieldRow}>
+          <span>Speech provider</span>
+          <select
+            value={settings.spokenProvider}
+            onChange={(e) => update({ spokenProvider: e.target.value as typeof settings.spokenProvider })}
+            className={styles.select}
+          >
+            <option value="browser">Browser / OS voices (free)</option>
+            <option value="azure">Microsoft Azure (BYOK)</option>
+            <option value="google">Google Cloud TTS (BYOK)</option>
+          </select>
+        </label>
+        {settings.spokenProvider !== 'browser' && (
+          <label className={styles.fieldRow}>
+            <span>Provider API key</span>
+            <input
+              type="password"
+              value={settings.spokenApiKey}
+              onChange={(e) => update({ spokenApiKey: e.target.value.trim() })}
+              className={styles.input}
+              placeholder="Paste your key"
+            />
+          </label>
+        )}
+        {settings.spokenProvider === 'azure' && (
+          <>
+            <label className={styles.fieldRow}>
+              <span>Azure region</span>
+              <input
+                type="text"
+                value={settings.spokenAzureRegion}
+                onChange={(e) => update({ spokenAzureRegion: e.target.value.trim().toLowerCase() })}
+                className={styles.input}
+                placeholder="eastus"
+              />
+            </label>
+            <label className={styles.fieldRow}>
+              <span>Azure voice</span>
+              <input
+                type="text"
+                value={settings.spokenAzureVoiceName}
+                onChange={(e) => update({ spokenAzureVoiceName: e.target.value.trim() })}
+                className={styles.input}
+                placeholder="en-US-JennyNeural"
+              />
+            </label>
+          </>
+        )}
+        {settings.spokenProvider === 'google' && (
+          <label className={styles.fieldRow}>
+            <span>Google voice</span>
+            <input
+              type="text"
+              value={settings.spokenGoogleVoiceName}
+              onChange={(e) => update({ spokenGoogleVoiceName: e.target.value.trim() })}
+              className={styles.input}
+              placeholder="en-US-Neural2-C"
+            />
+          </label>
+        )}
+        {hasSpeechSynthesis ? (
+          <>
+            <label className={styles.fieldRow}>
+              <span>Voice</span>
+              <select
+                value={settings.spokenVoiceURI ?? ''}
+                onChange={(e) => update({ spokenVoiceURI: e.target.value || null })}
+                className={styles.select}
+              >
+                <option value="">Auto ({voices.length} available)</option>
+                {voices.map((voice) => (
+                  <option key={voice.voiceURI} value={voice.voiceURI}>
+                    {voice.name} ({voice.lang})
+                  </option>
+                ))}
+              </select>
+            </label>
+            {selectedVoiceMissing && (
+              <p className={styles.bindingHint}>Saved voice was not found. Auto fallback is active.</p>
+            )}
+            <label className={styles.fieldRow}>
+              <span>Speech rate ({settings.spokenRate.toFixed(2)})</span>
+              <input
+                type="range"
+                min={0.7}
+                max={1.3}
+                step={0.01}
+                value={settings.spokenRate}
+                onChange={handleSpokenNumber('spokenRate')}
+                className={styles.slider}
+              />
+            </label>
+            <label className={styles.fieldRow}>
+              <span>Speech pitch ({settings.spokenPitch.toFixed(2)})</span>
+              <input
+                type="range"
+                min={0.7}
+                max={1.3}
+                step={0.01}
+                value={settings.spokenPitch}
+                onChange={handleSpokenNumber('spokenPitch')}
+                className={styles.slider}
+              />
+            </label>
+            <label className={styles.fieldRow}>
+              <span>Speech volume ({settings.spokenVolume.toFixed(2)})</span>
+              <input
+                type="range"
+                min={0.2}
+                max={1}
+                step={0.01}
+                value={settings.spokenVolume}
+                onChange={handleSpokenNumber('spokenVolume')}
+                className={styles.slider}
+              />
+            </label>
+            <button className={styles.bindingResetAll} onClick={testVoice}>
+              Test voice
+            </button>
+            {settings.spokenProvider !== 'browser' && (
+              <p className={styles.bindingHint}>BYOK mode is for local/personal use. Keys in frontend are not safe for public deploys.</p>
+            )}
+          </>
+        ) : (
+          <p className={styles.bindingHint}>Speech synthesis is not supported in this browser.</p>
+        )}
         <Toggle
           label="Inner / Outer tagging"
           description="Enables distinguishing inner (mental) vs outer (physical) stimuli"

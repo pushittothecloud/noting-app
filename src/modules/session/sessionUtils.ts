@@ -11,7 +11,6 @@ export function computeStats(notings: NotingEvent[], durationMs: number): Sessio
     see: 0,
     hear: 0,
     feel: 0,
-    taste: 0,
   }
 
   let fastestNotingMs = Infinity
@@ -106,7 +105,7 @@ export function computeStats(notings: NotingEvent[], durationMs: number): Sessio
   )
 
   // Per-sense average response time (only meaningful for guided/targeted notings)
-  const responseTimesBySense: Record<SenseKey, number[]> = { see: [], hear: [], feel: [], taste: [] }
+  const responseTimesBySense: Record<SenseKey, number[]> = { see: [], hear: [], feel: [] }
   for (const n of notings) {
     if (n.source === 'prompted' && n.prompt?.responseTimeMs != null && n.prompt.targetSense) {
       responseTimesBySense[n.prompt.targetSense].push(n.prompt.responseTimeMs)
@@ -117,7 +116,6 @@ export function computeStats(notings: NotingEvent[], durationMs: number): Sessio
     see:   avgArr(responseTimesBySense.see),
     hear:  avgArr(responseTimesBySense.hear),
     feel:  avgArr(responseTimesBySense.feel),
-    taste: avgArr(responseTimesBySense.taste),
   }
 
   return {

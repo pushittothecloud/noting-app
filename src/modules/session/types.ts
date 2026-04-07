@@ -1,5 +1,5 @@
 // ─── Sense ────────────────────────────────────────────────────────────────────
-export type SenseKey = 'see' | 'hear' | 'feel' | 'taste'
+export type SenseKey = 'see' | 'hear' | 'feel'
 
 // ─── Key Bindings ─────────────────────────────────────────────────────────────
 export interface SenseBinding {
@@ -45,14 +45,6 @@ export const SENSES: Record<SenseKey, SenseMeta> = {
     wasdKey: 'a',
     color: '#86efac',
   },
-  taste: {
-    key: 'taste',
-    label: 'Smell / Taste',
-    emoji: '👃',
-    arrowKey: 'ArrowDown',
-    wasdKey: 's',
-    color: '#fde68a',
-  },
 }
 
 export const KEY_TO_SENSE: Record<string, SenseKey> = {
@@ -65,13 +57,11 @@ export const KEY_TO_SENSE: Record<string, SenseKey> = {
   ArrowLeft: 'feel',
   a: 'feel',
   A: 'feel',
-  ArrowDown: 'taste',
-  s: 'taste',
-  S: 'taste',
 }
 
 // ─── Training Modes ───────────────────────────────────────────────────────────
 export type TrainingMode =
+  | 'voice'         // Lvl 10 – voice command noting (say see/hear/feel)
   | 'reaction'      // Lvl 1 – stimulus-to-response warm-up (flash/beep)
   | 'guided'        // Lvl 2 – prompted response
   | 'guided_granularity' // Lvl 3 – one sense, many sub-notes
@@ -195,6 +185,15 @@ export interface AppSettings {
   visualFeedbackStyle: VisualFeedbackStyle
   audioFeedbackEnabled: boolean
   spokenFeedbackEnabled: boolean
+  spokenProvider: 'browser' | 'azure' | 'google'
+  spokenVoiceURI: string | null
+  spokenRate: number
+  spokenPitch: number
+  spokenVolume: number
+  spokenApiKey: string
+  spokenAzureRegion: string
+  spokenAzureVoiceName: string
+  spokenGoogleVoiceName: string
   innerOuterEnabled: boolean
   backgroundAudio: boolean
   backgroundVisuals: boolean
@@ -209,6 +208,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   visualFeedbackStyle: 'both',
   audioFeedbackEnabled: false,
   spokenFeedbackEnabled: true,
+  spokenProvider: 'browser',
+  spokenVoiceURI: null,
+  spokenRate: 0.8,
+  spokenPitch: 0.7,
+  spokenVolume: 0.7,
+  spokenApiKey: '',
+  spokenAzureRegion: 'eastus',
+  spokenAzureVoiceName: 'en-US-JennyNeural',
+  spokenGoogleVoiceName: 'en-US-Neural2-C',
   innerOuterEnabled: false,
   backgroundAudio: false,
   backgroundVisuals: false,
@@ -219,6 +227,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
     see:   { primary: 'ArrowUp',    secondary: 'w' },
     hear:  { primary: 'ArrowRight', secondary: 'd' },
     feel:  { primary: 'ArrowLeft',  secondary: 'a' },
-    taste: { primary: 'ArrowDown',  secondary: 's' },
   },
 }

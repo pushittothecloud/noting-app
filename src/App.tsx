@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { NavBar } from './components/NavBar'
+import { FeedbackButton } from './components/FeedbackButton'
 import { Home } from './screens/Home'
 import { Session } from './screens/Session'
 import { Results } from './screens/Results'
@@ -10,7 +11,8 @@ import './index.css'
 
 export function App() {
   const theme = useSettingsStore((s) => s.settings.theme)
-  const routerBasename = window.location.hostname.endsWith('github.io') ? '/noting-app' : '/'
+  const isNotingSubpath = window.location.pathname === '/noting-app' || window.location.pathname.startsWith('/noting-app/')
+  const routerBasename = isNotingSubpath ? '/noting-app' : '/'
 
   return (
     <div data-theme={theme} style={{ minHeight: '100vh' }}>
@@ -23,6 +25,7 @@ export function App() {
           <Route path="/progress" element={<Progress />} />
           <Route path="/settings" element={<Settings />} />
         </Routes>
+        <FeedbackButton />
       </BrowserRouter>
     </div>
   )

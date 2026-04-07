@@ -11,7 +11,6 @@ export const DEFAULT_KEY_MAP: KeyMap = {
   see:   { primary: 'ArrowUp',    secondary: 'w' },
   hear:  { primary: 'ArrowRight', secondary: 'd' },
   feel:  { primary: 'ArrowLeft',  secondary: 'a' },
-  taste: { primary: 'ArrowDown',  secondary: 's' },
 }
 
 // ─── Lookup builder ───────────────────────────────────────────────────────────

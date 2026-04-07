@@ -65,9 +65,6 @@ export function Home() {
         <div className={styles.keyRow}>
           <kbd>← A</kbd><span>Feel</span>
         </div>
-        <div className={styles.keyRow}>
-          <kbd>↓ S</kbd><span>Smell / Taste</span>
-        </div>
       </div>
     </main>
   )

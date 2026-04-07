@@ -1,6 +1,6 @@
 import type { SessionResult, SenseKey } from '../session/types'
 
-const SENSE_KEYS: SenseKey[] = ['see', 'hear', 'feel', 'taste']
+const SENSE_KEYS: SenseKey[] = ['see', 'hear', 'feel']
 
 export interface FreeSessionAnalysis {
   weakSenses: SenseKey[]

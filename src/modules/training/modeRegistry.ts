@@ -83,6 +83,14 @@ export const ACTIVE_MODES: ModeDefinition[] = [
     guided: true,
     supportsHold: false,
   },
+  {
+    id: 'voice',
+    level: 10,
+    title: 'Voice Recognition',
+    description: 'Say "see", "hear", or "feel" to log notings hands-free.',
+    guided: false,
+    supportsHold: false,
+  },
 ]
 
 export function getModeDefinition(mode: TrainingMode): ModeDefinition {
@@ -102,8 +110,15 @@ export function isGuidedMode(mode: TrainingMode) {
   return getModeDefinition(mode).guided
 }
 
-const GUIDED_SENSES: SenseKey[] = ['see', 'hear', 'feel', 'taste']
-const SPATIAL_DIRECTIONS = ['up', 'down', 'left', 'right', 'forward', 'back'] as const
+const GUIDED_SENSES: SenseKey[] = ['see', 'hear', 'feel']
+const SPATIAL_DIRECTIONS = [
+  { label: 'up', phrase: 'upward' },
+  { label: 'down', phrase: 'downward' },
+  { label: 'left', phrase: 'to the left' },
+  { label: 'right', phrase: 'to the right' },
+  { label: 'forward', phrase: 'forward' },
+  { label: 'back', phrase: 'backward' },
+] as const
 
 type GranularityTier = 'core' | 'deeper' | 'micro' | 'advanced'
 
@@ -172,20 +187,6 @@ const GRANULARITY_CATALOG: Record<SenseKey, GranularityAspect[]> = {
     { tier: 'micro', prompt: 'Notice shifting intensity moment to moment' },
     { tier: 'advanced', prompt: 'Notice heaviness, openness, or contraction' },
     { tier: 'advanced', prompt: 'Notice agitation in the body field' },
-  ],
-  // taste key is used for smell/taste channel in this app.
-  taste: [
-    { tier: 'core', prompt: 'Notice taste quality (sweet, sour, salty, bitter, umami)' },
-    { tier: 'core', prompt: 'Notice smell intensity (strong or faint)' },
-    { tier: 'core', prompt: 'Notice pleasant vs unpleasant tone' },
-    { tier: 'core', prompt: 'Notice familiar vs unfamiliar quality' },
-    { tier: 'deeper', prompt: 'Notice sharp vs dull smell/taste tone' },
-    { tier: 'deeper', prompt: 'Notice flavor blend (taste plus smell)' },
-    { tier: 'deeper', prompt: 'Notice aftertaste' },
-    { tier: 'deeper', prompt: 'Notice lingering vs instant quality' },
-    { tier: 'micro', prompt: 'Notice fading vs intensifying change' },
-    { tier: 'micro', prompt: 'Notice subtle background smells' },
-    { tier: 'micro', prompt: 'Notice breath-related taste shifts' },
   ],
 }
 
@@ -274,7 +275,7 @@ export function createGuidedPrompt(
     return {
       id: nanoid(),
       kind: 'sense',
-      cue: `Feel ${direction}`,
+      cue: `Feel ${direction.phrase}`,
       targetSense: 'feel',
       presentedAtMs: elapsedMs,
     }

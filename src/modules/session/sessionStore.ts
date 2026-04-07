@@ -172,6 +172,8 @@ export const useSessionStore = create<SessionStore>()(
               id: activePrompt?.id,
               kind: activePrompt?.kind ?? 'sense',
               cue: activePrompt?.cue,
+              fromSense: activePrompt?.fromSense,
+              transitionPath: activePrompt?.transitionPath,
               targetSense: activePrompt?.targetSense,
               presentedAtMs: activePrompt?.presentedAtMs,
               responseTimeMs: prompt?.responseTimeMs ?? (activePrompt ? timestampMs - activePrompt.presentedAtMs : reactionTimeMs),
@@ -197,16 +199,26 @@ export const useSessionStore = create<SessionStore>()(
         state.active.lastNotingAt = timestampMs
 
         if (activePrompt) {
+          const mode = state.active.config.mode
+          const promptWasCorrect = resolvedPrompt?.isCorrect === true
+
+          if ((mode === 'guided_granularity' || mode === 'sense_shift') && !promptWasCorrect) {
+            // Keep guided aspect/transition cues active until they are completed correctly.
+            return
+          }
+
           state.active.previousPromptTarget = activePrompt.targetSense
           state.active.previousPromptKind = activePrompt.kind
           state.active.currentPrompt = isGuidedMode(state.active.config.mode)
-            ? createGuidedPrompt(
-              timestampMs,
-              state.active.config.mode,
-              activePrompt.targetSense,
-              activePrompt.kind,
-              state.active.config.senseWeights,
-            )
+            ? (state.active.config.mode === 'sense_shift' || state.active.config.mode === 'guided_granularity' || state.active.config.mode === 'reaction')
+              ? null
+              : createGuidedPrompt(
+                timestampMs,
+                state.active.config.mode,
+                activePrompt.targetSense,
+                activePrompt.kind,
+                state.active.config.senseWeights,
+              )
             : null
         }
       })

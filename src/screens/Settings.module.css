@@ -100,6 +100,10 @@
   min-width: 120px;
 }
 
+.slider {
+  width: 170px;
+}
+
 .resetBtn {
   margin-top: 1rem;
   padding: 0.4rem 1.2rem;

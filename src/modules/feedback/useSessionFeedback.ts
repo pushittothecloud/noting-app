@@ -13,7 +13,6 @@ const FREQUENCIES: Record<SenseKey, number> = {
   see: 523.25,
   hear: 659.25,
   feel: 392.0,
-  taste: 329.63,
 }
 
 export function useSessionFeedback({

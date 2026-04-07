@@ -3,6 +3,14 @@ import { persist } from 'zustand/middleware'
 import type { AppSettings } from '../session/types'
 import { DEFAULT_SETTINGS } from '../session/types'
 
+function sanitizeKeyMap(keyMap: AppSettings['keyMap'] | undefined): AppSettings['keyMap'] {
+  return {
+    see: keyMap?.see ?? DEFAULT_SETTINGS.keyMap.see,
+    hear: keyMap?.hear ?? DEFAULT_SETTINGS.keyMap.hear,
+    feel: keyMap?.feel ?? DEFAULT_SETTINGS.keyMap.feel,
+  }
+}
+
 interface SettingsStore {
   settings: AppSettings
   update: (patch: Partial<AppSettings>) => void
@@ -24,13 +32,18 @@ export const useSettingsStore = create<SettingsStore>()(
       name: 'noting-settings',
       merge: (persistedState, currentState) => {
         const persisted = persistedState as Partial<SettingsStore> | undefined
+        const mergedSettings = {
+          ...DEFAULT_SETTINGS,
+          ...currentState.settings,
+          ...persisted?.settings,
+        }
+
         return {
           ...currentState,
           ...persisted,
           settings: {
-            ...DEFAULT_SETTINGS,
-            ...currentState.settings,
-            ...persisted?.settings,
+            ...mergedSettings,
+            keyMap: sanitizeKeyMap(mergedSettings.keyMap),
           },
         }
       },

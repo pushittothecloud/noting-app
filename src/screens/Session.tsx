@@ -4,6 +4,7 @@ import { useSessionStore } from '../modules/session/sessionStore'
 import { useSettingsStore } from '../modules/settings/settingsStore'
 import { useFeedbackStore } from '../modules/feedback/feedbackStore'
 import { useSessionFeedback } from '../modules/feedback/useSessionFeedback'
+import { getAvailableVoices, resolveVoice, speakText } from '../modules/feedback/speechSynthesis'
 import { useKeyInput } from '../modules/input/useKeyInput'
 import { SenseIndicator } from '../components/SenseIndicator'
 import { SenseFeedbackOverlay } from '../components/SenseFeedbackOverlay'
@@ -11,8 +12,21 @@ import { SENSES, type SenseKey, type TrainingMode } from '../modules/session/typ
 import { isGuidedMode } from '../modules/training/modes'
 import styles from './Session.module.css'
 
+type VoiceRecognition = {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: unknown) => void) | null
+  onerror: ((event: unknown) => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+
 function getIntroLines(mode: TrainingMode): string[] {
   switch (mode) {
+    case 'voice':
+      return ['Say see, hear, or feel to log notings hands-free.', 'Allow microphone access when prompted.']
     case 'reaction':
       return ['React to the stimulus only.', 'Flash means See. Beep means Hear.']
     case 'guided':
@@ -79,6 +93,8 @@ export function Session() {
   const [senseShiftStep, setSenseShiftStep] = useState(0)
   const [showIntro, setShowIntro] = useState(true)
   const [sessionStarted, setSessionStarted] = useState(false)
+  const [voiceListening, setVoiceListening] = useState(false)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const spokenPromptIdRef = useRef<string | null>(null)
   const reactionStimulusIdRef = useRef<string | null>(null)
@@ -87,31 +103,49 @@ export function Session() {
   const reactionPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
   const isFreeModRef = useRef(false)
-  const freeSpeechTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const reactionFlashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const introSpokenModeRef = useRef<TrainingMode | null>(null)
+  const voiceRecognitionRef = useRef<VoiceRecognition | null>(null)
+  const voiceRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastVoiceLoggedAtRef = useRef<Record<SenseKey, number>>({ see: 0, hear: 0, feel: 0 })
 
-  function speakIntro() {
-    if (!settings.spokenFeedbackEnabled || !('speechSynthesis' in window)) return
+  function speakSenseNow(sense: SenseKey) {
+    if (!settings.spokenFeedbackEnabled) return
+    if (!('speechSynthesis' in window)) return
+
+    const synth = window.speechSynthesis
+    synth.cancel()
+    synth.resume()
+
+    const utterance = new SpeechSynthesisUtterance(SENSES[sense].label)
+    const preferredVoice = resolveVoice(settings.spokenVoiceURI, 'en')
+    const localFallback = getAvailableVoices().find((voice) => voice.localService)
+    const voiceForSpeed = preferredVoice?.localService === false ? localFallback ?? null : preferredVoice
+    if (voiceForSpeed) {
+      utterance.voice = voiceForSpeed
+      utterance.lang = voiceForSpeed.lang
+    }
+    utterance.rate = Math.max(settings.spokenRate, 1.1)
+    utterance.pitch = settings.spokenPitch
+    utterance.volume = settings.spokenVolume
+    synth.speak(utterance)
+  }
+
+  function speakIntro(force = false) {
+    if (!force && !settings.spokenFeedbackEnabled) return
+    if (!('speechSynthesis' in window)) return
 
     const text = getIntroLines(plannedMode).join('. ')
-    window.speechSynthesis.cancel()
-
-    const speakOnce = () => {
-      const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = 0.96
-      utterance.pitch = 0.96
-      utterance.volume = 0.72
-      window.speechSynthesis.speak(utterance)
-    }
-
-    // Some browsers silently drop the first call until voices are ready.
-    speakOnce()
-    setTimeout(() => {
-      if (!window.speechSynthesis.speaking) {
-        speakOnce()
-      }
-    }, 220)
+    void speakText({
+      text,
+      // Intro guidance should start immediately; local browser TTS avoids network lag.
+      provider: 'browser',
+      voiceURI: settings.spokenVoiceURI,
+      rate: settings.spokenRate,
+      pitch: settings.spokenPitch,
+      volume: settings.spokenVolume,
+      interrupt: true,
+    })
   }
 
   function beginSession() {
@@ -143,9 +177,30 @@ export function Session() {
     if (!showIntro || !settings.spokenFeedbackEnabled || !('speechSynthesis' in window)) return
     if (introSpokenModeRef.current === plannedMode) return
 
-    introSpokenModeRef.current = plannedMode
     speakIntro()
-  }, [showIntro, plannedMode, settings.spokenFeedbackEnabled])
+
+    const synth = window.speechSynthesis
+    const markIfStarted = window.setTimeout(() => {
+      if (synth.speaking || synth.pending) {
+        introSpokenModeRef.current = plannedMode
+      }
+    }, 120)
+
+    const fallbackOnInteraction = () => {
+      if (introSpokenModeRef.current === plannedMode) return
+      introSpokenModeRef.current = plannedMode
+      speakIntro(true)
+    }
+
+    window.addEventListener('pointerdown', fallbackOnInteraction, { once: true })
+    window.addEventListener('keydown', fallbackOnInteraction, { once: true })
+
+    return () => {
+      clearTimeout(markIfStarted)
+      window.removeEventListener('pointerdown', fallbackOnInteraction)
+      window.removeEventListener('keydown', fallbackOnInteraction)
+    }
+  }, [showIntro, plannedMode, settings.spokenFeedbackEnabled, settings.spokenVoiceURI, settings.spokenRate, settings.spokenPitch, settings.spokenVolume])
 
   useEffect(() => {
     if (!active?.config.durationSec) return
@@ -156,7 +211,7 @@ export function Session() {
   }, [active?.config.durationSec, elapsed])
 
   useKeyInput({
-    enabled: !!active && status === 'running',
+    enabled: !!active && status === 'running' && active.config.mode !== 'voice',
     onTap(sense) {
       if (isFocusedMode) return
 
@@ -200,24 +255,8 @@ export function Session() {
         return
       }
 
-      // Speak label immediately in free mode — directly in the event callback,
-      // not via useEffect, so there is zero render-cycle latency.
-      if (isFreeModRef.current && 'speechSynthesis' in window) {
-        const synth = window.speechSynthesis
-        synth.cancel()
-
-        if (freeSpeechTimerRef.current) {
-          clearTimeout(freeSpeechTimerRef.current)
-        }
-
-        // Queue on next tick so cancel fully flushes in engines that otherwise drop rapid restart.
-        freeSpeechTimerRef.current = setTimeout(() => {
-          const u = new SpeechSynthesisUtterance(SENSES[sense].label)
-          u.rate = 1.4
-          u.pitch = 0.9
-          u.volume = 0.7
-          synth.speak(u)
-        }, 0)
+      if (isFreeModRef.current && settings.spokenFeedbackEnabled) {
+        speakSenseNow(sense)
       }
 
       const isFocusPrompt = isGuidedShiftMode && currentPrompt?.kind === 'attention'
@@ -371,6 +410,7 @@ export function Session() {
   const isGranularityMode = mode === 'guided_granularity'
   const isSenseShiftMode = mode === 'sense_shift'
   const isFreeMode = mode === 'free'
+  const isVoiceMode = mode === 'voice'
   isFreeModRef.current = isFreeMode
   const isFocusedMode = mode === 'focused'
   const isGuidedShiftMode = mode === 'guided_shift'
@@ -389,6 +429,124 @@ export function Session() {
   })
   const focusedHoldCount = focusedHolds.length
   const focusedTotalMs = focusedHolds.reduce((sum, n) => sum + (n.holdDurationMs ?? 0), 0)
+
+  useEffect(() => {
+    if (!active || !isVoiceMode) {
+      voiceRecognitionRef.current?.stop()
+      voiceRecognitionRef.current = null
+      if (voiceRestartTimerRef.current) {
+        clearTimeout(voiceRestartTimerRef.current)
+        voiceRestartTimerRef.current = null
+      }
+      setVoiceListening(false)
+      return
+    }
+
+    if (isPaused) {
+      voiceRecognitionRef.current?.stop()
+      setVoiceListening(false)
+      return
+    }
+
+    const Ctor = (
+      (window as typeof window & { SpeechRecognition?: new () => VoiceRecognition }).SpeechRecognition ??
+      (window as typeof window & { webkitSpeechRecognition?: new () => VoiceRecognition }).webkitSpeechRecognition
+    )
+
+    if (!Ctor) {
+      setVoiceError('Voice recognition is not supported in this browser.')
+      return
+    }
+
+    setVoiceError(null)
+
+    if (!voiceRecognitionRef.current) {
+      const recognition = new Ctor()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
+
+      recognition.onresult = (event) => {
+        const speechEvent = event as {
+          resultIndex: number
+          results: ArrayLike<{ isFinal: boolean; 0?: { transcript?: string } }>
+        }
+
+        for (let i = speechEvent.resultIndex; i < speechEvent.results.length; i += 1) {
+          const result = speechEvent.results[i]
+          if (!result?.isFinal) continue
+
+          const transcript = result[0]?.transcript?.toLowerCase() ?? ''
+          const matches = transcript.match(/\b(see|hear|feel)\b/g)
+          if (!matches) continue
+
+          for (const match of matches) {
+            const sense = match as SenseKey
+            const now = Date.now()
+            if (now - lastVoiceLoggedAtRef.current[sense] < 260) continue
+            lastVoiceLoggedAtRef.current[sense] = now
+
+            recordNoting({
+              sense,
+              inputType: 'tap',
+              attentionType: 'open',
+              source: 'free',
+            })
+
+            if (shouldFlashSenseFeedback) {
+              flash(sense)
+            }
+          }
+        }
+      }
+
+      recognition.onerror = (event) => {
+        const typedEvent = event as { error?: string }
+        if (typedEvent.error === 'not-allowed' || typedEvent.error === 'service-not-allowed') {
+          setVoiceError('Microphone access is blocked. Allow mic access to use voice mode.')
+        }
+      }
+
+      recognition.onend = () => {
+        setVoiceListening(false)
+        if (!active || active.config.mode !== 'voice' || isPaused) return
+
+        if (voiceRestartTimerRef.current) {
+          clearTimeout(voiceRestartTimerRef.current)
+        }
+
+        voiceRestartTimerRef.current = setTimeout(() => {
+          try {
+            recognition.start()
+            setVoiceListening(true)
+          } catch {
+            // Ignore rapid restart errors.
+          }
+        }, 220)
+      }
+
+      voiceRecognitionRef.current = recognition
+    }
+
+    const recognition = voiceRecognitionRef.current
+    if (!recognition) return
+
+    try {
+      recognition.start()
+      setVoiceListening(true)
+    } catch {
+      // Ignore invalid-state when already running.
+    }
+
+    return () => {
+      voiceRecognitionRef.current?.stop()
+      setVoiceListening(false)
+      if (voiceRestartTimerRef.current) {
+        clearTimeout(voiceRestartTimerRef.current)
+        voiceRestartTimerRef.current = null
+      }
+    }
+  }, [active, isVoiceMode, isPaused, recordNoting, flash, shouldFlashSenseFeedback])
 
   useEffect(() => {
     setSenseShiftStep(0)
@@ -467,13 +625,27 @@ export function Session() {
     if (spokenPromptIdRef.current === currentPrompt.id) return
 
     spokenPromptIdRef.current = currentPrompt.id
-    const utterance = new SpeechSynthesisUtterance(currentPrompt.cue)
-    utterance.rate = 0.92
-    utterance.pitch = 0.95
-    utterance.volume = 0.65
-    window.speechSynthesis.cancel()
-    window.speechSynthesis.speak(utterance)
-  }, [isGuided, isReactionMode, currentPrompt, isPaused, settings.spokenFeedbackEnabled])
+    void speakText({
+      text: currentPrompt.cue,
+      // Prompt cues are interactive and should remain low-latency.
+      provider: 'browser',
+      voiceURI: settings.spokenVoiceURI,
+      rate: settings.spokenRate,
+      pitch: settings.spokenPitch,
+      volume: settings.spokenVolume,
+      interrupt: true,
+    })
+  }, [
+    isGuided,
+    isReactionMode,
+    currentPrompt,
+    isPaused,
+    settings.spokenFeedbackEnabled,
+    settings.spokenVoiceURI,
+    settings.spokenRate,
+    settings.spokenPitch,
+    settings.spokenVolume,
+  ])
 
   useEffect(() => {
     if (!isReactionMode || !currentPrompt || isPaused) return
@@ -494,9 +666,6 @@ export function Session() {
 
   useEffect(() => {
     return () => {
-      if (freeSpeechTimerRef.current) {
-        clearTimeout(freeSpeechTimerRef.current)
-      }
       if (reactionFlashTimerRef.current) {
         clearTimeout(reactionFlashTimerRef.current)
       }
@@ -509,6 +678,10 @@ export function Session() {
       if (reactionPromptTimerRef.current) {
         clearTimeout(reactionPromptTimerRef.current)
       }
+      if (voiceRestartTimerRef.current) {
+        clearTimeout(voiceRestartTimerRef.current)
+      }
+      voiceRecognitionRef.current?.stop()
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel()
       }
@@ -535,7 +708,7 @@ export function Session() {
             <button className={styles.introBtnPrimary} onClick={beginSession}>Start Session</button>
             <button
               className={styles.introBtnSecondary}
-              onClick={speakIntro}
+              onClick={() => speakIntro(true)}
             >
               Play Voice Guide
             </button>
@@ -577,6 +750,8 @@ export function Session() {
                 ? 'Guided Shift'
                 : mode === 'spatial_feel'
                   ? 'Spatial Feel'
+                  : mode === 'voice'
+                    ? 'Voice Recognition'
                 : isGuided
                   ? 'Guided Mode'
                   : mode.replace('_', ' ')
@@ -599,6 +774,14 @@ export function Session() {
         <p className={styles.guidance}>Drop the old sense instantly. Do not drag it with you.</p>
       )}
 
+      {isVoiceMode && !isPaused && (
+        <>
+          <p className={styles.guidance}>Say: see, hear, or feel. Each command logs one noting.</p>
+          <p className={styles.guidance}>{voiceListening ? 'Mic listening...' : 'Mic starting...'}</p>
+          {voiceError && <p className={styles.guidance}>{voiceError}</p>}
+        </>
+      )}
+
       {mode === 'spatial_feel' && !isPaused && (
         <p className={styles.guidance}>Prompt says the direction. You respond with Feel every time.</p>
       )}
@@ -616,7 +799,7 @@ export function Session() {
         <section className={styles.focusPanel}>
           <h3 className={styles.focusHeading}>Choose Meditation Object</h3>
           <div className={styles.objectGrid}>
-            {(['see', 'hear', 'feel', 'taste'] as const).map((sense) => (
+            {(['see', 'hear', 'feel'] as const).map((sense) => (
               <button
                 key={sense}
                 className={`${styles.objectBtn} ${focusedObject === sense ? styles.objectBtnActive : ''}`}
@@ -685,10 +868,6 @@ export function Session() {
           <SenseIndicator sense="feel" active={activeSense === 'feel' || heldSense === 'feel'} size="lg" />
           <div className={styles.notingCount}>{totalNotings}</div>
           <SenseIndicator sense="hear" active={activeSense === 'hear' || heldSense === 'hear'} size="lg" />
-        </div>
-        {/* bottom = taste */}
-        <div className={styles.bottom}>
-          <SenseIndicator sense="taste" active={activeSense === 'taste' || heldSense === 'taste'} size="lg" />
         </div>
       </div>
 

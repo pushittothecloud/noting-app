@@ -1,0 +1,42 @@
+.feedbackBtn {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 70;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255 255 255 / 0.26);
+  background: rgba(12 12 20 / 0.88);
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(8px);
+  transition: transform 140ms ease, background-color 140ms ease;
+}
+
+.feedbackBtn:hover {
+  transform: translateY(-1px);
+  background: rgba(22 22 34 / 0.95);
+}
+
+.feedbackBtn:focus-visible {
+  outline: 2px solid #8fd4ff;
+  outline-offset: 2px;
+}
+
+[data-theme='light'] .feedbackBtn {
+  border-color: rgba(0 0 0 / 0.18);
+  background: rgba(255 255 255 / 0.95);
+  color: #121226;
+}
+
+@media (max-width: 640px) {
+  .feedbackBtn {
+    left: 12px;
+    bottom: 12px;
+    padding: 9px 12px;
+    font-size: 0.8125rem;
+  }
+}

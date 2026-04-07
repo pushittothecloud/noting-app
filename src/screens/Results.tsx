@@ -20,10 +20,15 @@ export function Results() {
 
   const { stats } = lastResult
   const durationSec = (stats.durationMs / 1000).toFixed(1)
+  const isReactionMode = lastResult.config.mode === 'reaction'
+  const isGranularityMode = lastResult.config.mode === 'guided_granularity'
+  const isSenseShiftMode = lastResult.config.mode === 'sense_shift'
   const isFreeMode = lastResult.config.mode === 'free'
   const guidedSummary = getGuidedReactionSummary(lastResult)
   const lowestSenseInsight = getLowestSenseInsight(lastResult)
   const freeAnalysis = isFreeMode ? analyzeFreeSession(lastResult) : null
+  const granularityMetrics = isGranularityMode ? getGranularityMetrics(lastResult.notings) : null
+  const senseShiftMetrics = isSenseShiftMode ? getSenseShiftMetrics(lastResult.notings) : null
 
   return (
     <main className={styles.page}>
@@ -53,11 +58,25 @@ export function Results() {
         </div>
       )}
 
+      {granularityMetrics && (
+        <div className={styles.statRow}>
+          <Stat label="Notes / Object" value={granularityMetrics.notesPerObject.toFixed(2)} />
+          <Stat label="Burst Density" value={`${granularityMetrics.burstDensity.toFixed(2)}/s`} />
+        </div>
+      )}
+
+      {senseShiftMetrics && (
+        <div className={styles.statRow}>
+          <Stat label="Switch Reaction" value={senseShiftMetrics.switchReactionMs != null ? `${Math.round(senseShiftMetrics.switchReactionMs)}ms` : '—'} />
+          <Stat label="Stuck Error Rate" value={`${Math.round(senseShiftMetrics.stuckErrorRatePct)}%`} />
+        </div>
+      )}
+
       {lastResult.config.mode === 'targeted' && (
         <div className={styles.senseBreakdown}>
           <h3 className={styles.analysisHeading}>Response time per sense</h3>
           <div className={styles.statRow}>
-            {(['see', 'hear', 'feel', 'taste'] as const).map((sense) => {
+            {(['see', 'hear', 'feel'] as const).map((sense) => {
               const ms = stats.averageResponseMsBySense[sense]
               return (
                 <Stat
@@ -80,6 +99,24 @@ export function Results() {
       {isFreeMode && (
         <p className={styles.insight}>
           This session is your baseline: pace, streaks, inactivity, and sense balance all come from spontaneous noting only.
+        </p>
+      )}
+
+      {isGranularityMode && (
+        <p className={styles.insight}>
+          Do not move to a new object. Find more inside the same one.
+        </p>
+      )}
+
+      {isSenseShiftMode && (
+        <p className={styles.insight}>
+          Drop the old sense instantly. Do not drag it with you.
+        </p>
+      )}
+
+      {isReactionMode && (
+        <p className={styles.insight}>
+          Calibration mode: train clean stimulus-to-response speed before deeper noting work.
         </p>
       )}
 
@@ -146,6 +183,56 @@ export function Results() {
       </div>
     </main>
   )
+}
+
+function getGranularityMetrics(notings: Array<{ timestamp: number; prompt?: { targetSense?: string } }>) {
+  const prompted = notings.filter((n) => n.prompt?.targetSense)
+  if (prompted.length === 0) {
+    return { notesPerObject: 0, burstDensity: 0 }
+  }
+
+  let objectRuns = 1
+  let burstCount = 1
+  for (let i = 1; i < prompted.length; i++) {
+    const prev = prompted[i - 1]
+    const cur = prompted[i]
+    if (cur.prompt?.targetSense !== prev.prompt?.targetSense) {
+      objectRuns += 1
+    }
+    if (cur.timestamp - prev.timestamp <= 1200) {
+      burstCount += 1
+    }
+  }
+
+  const notesPerObject = prompted.length / objectRuns
+  const burstWindowSec = prompted.length > 1 ? Math.max((prompted[prompted.length - 1].timestamp - prompted[0].timestamp) / 1000, 1) : 1
+  const burstDensity = burstCount / burstWindowSec
+
+  return { notesPerObject, burstDensity }
+}
+
+function getSenseShiftMetrics(
+  notings: Array<{
+    sense: string
+    prompt?: { kind?: string; fromSense?: string; responseTimeMs?: number; isCorrect?: boolean }
+  }>
+) {
+  const transitions = notings.filter((n) => n.prompt?.kind === 'transition')
+  if (transitions.length === 0) {
+    return { switchReactionMs: null, stuckErrorRatePct: 0 }
+  }
+
+  const responseTimes = transitions
+    .map((n) => n.prompt?.responseTimeMs)
+    .filter((value): value is number => value != null)
+  const switchReactionMs = responseTimes.length
+    ? responseTimes.reduce((sum, value) => sum + value, 0) / responseTimes.length
+    : null
+
+  const stuckErrors = transitions.filter((n) => n.prompt?.isCorrect === false && n.prompt?.fromSense === n.sense).length
+  const stuckErrorRatePct = (stuckErrors / transitions.length) * 100
+
+  return { switchReactionMs, stuckErrorRatePct }
 }
 
 function Stat({ label, value }: { label: string; value: string | number }) {

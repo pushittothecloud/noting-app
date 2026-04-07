@@ -23,7 +23,7 @@ export function Progress() {
   const bestNps = Math.max(...history.map((r) => r.stats.notingsPerSecond))
   const bestStreak = Math.max(...history.map((r) => r.stats.fastestStreak))
 
-  const aggregateCounts: Record<SenseKey, number> = { see: 0, hear: 0, feel: 0, taste: 0 }
+  const aggregateCounts: Record<SenseKey, number> = { see: 0, hear: 0, feel: 0 }
   for (const r of history) {
     for (const k of Object.keys(r.stats.countBySense) as SenseKey[]) {
       aggregateCounts[k] += r.stats.countBySense[k]
@@ -43,7 +43,7 @@ export function Progress() {
     inactivityPeriods: [],
     longestInactivityMs: 0,
     durationMs: 0,
-    averageResponseMsBySense: { see: null, hear: null, feel: null, taste: null },
+    averageResponseMsBySense: { see: null, hear: null, feel: null },
   }
 
   return (
